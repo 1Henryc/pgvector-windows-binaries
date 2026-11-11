@@ -38,7 +38,7 @@ jobs:
           arch: x64
 
       - name: Checkout pgvector 
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: pgvector/pgvector
           ref: ${{ env.PGV_TAG }}
@@ -134,7 +134,7 @@ jobs:
           }
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pg${{ matrix.pg_version }}-binaries
           path: out/*
@@ -148,7 +148,7 @@ jobs:
       contents: write
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           pattern: "*-binaries"
@@ -162,7 +162,7 @@ jobs:
           sha256sum -c SHA256SUMS.txt
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.inputs.pgvector_tag }}
           name: "pgvector ${{ github.event.inputs.pgvector_tag }} for Windows (x64)"
