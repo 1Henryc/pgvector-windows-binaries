@@ -23,7 +23,7 @@ Run PowerShell **as Administrator**:
 ```powershell
 # 1. Download the installer
 Invoke-WebRequest `
-  -Uri "https://raw.githubusercontent.com/1Henryc/pgvector-windows-binaries/main/install-pgvector.ps1" `
+  -Uri "https://raw.githubusercontent.com/1Henryc/pgvector-windows-binaries/main/scripts/install-pgvector.ps1" `
   -OutFile install-pgvector.ps1
 
 # 2. Review the script before running it
@@ -102,7 +102,7 @@ ALTER EXTENSION vector UPDATE;
 
 ## How the binaries are built
 
-Builds are produced by the [`Build and Release Windows Binaries`](.github/workflows/build.yml) workflow:
+Builds are produced by the [`Build and Release Windows Binaries`](.github/workflows/release.yml) workflow:
 
 1. A maintainer triggers it manually (`workflow_dispatch`) with an official pgvector tag.
 2. For each PostgreSQL version (16, 17, 18), the workflow:
