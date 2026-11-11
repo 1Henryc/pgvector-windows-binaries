@@ -22,18 +22,13 @@ Run PowerShell **as Administrator**:
 
 ```powershell
 # 1. Download the installer
+Set-ExecutionPolicy Bypass -Scope Process -Force
 Invoke-WebRequest `
   -Uri "https://raw.githubusercontent.com/1Henryc/pgvector-windows-binaries/main/scripts/install-pgvector.ps1" `
   -OutFile install-pgvector.ps1
 
-# 2. Review the script before running it
-notepad .\install-pgvector.ps1
-
-# 3. Preview what would happen (no changes made)
-.\install-pgvector.ps1 -Version v0.8.7 -PgVersion 17 -WhatIf
-
-# 4. Install
-.\install-pgvector.ps1 -Version v0.8.7 -PgVersion 17
+# 2. Install
+.\install-pgvector.ps1 -Version v0.8.7 -PgVersion 18
 ```
 
 Then, in your database:
@@ -51,7 +46,6 @@ SELECT '[1,2,3]'::vector;
 | `-PgVersion` | PostgreSQL major version (`16`, `17`, `18`). Required if several are installed | auto-detected if only one is present |
 | `-PgRoot`    | Custom PostgreSQL installation path                                         | `C:\Program Files\PostgreSQL\<ver>`  |
 | `-Repo`      | Source repository for the release assets                                    | `1Henryc/pgvector-windows-binaries`  |
-| `-WhatIf`    | Show what would be installed without changing anything                      | off                                  |
 
 What the installer does:
 
@@ -78,7 +72,7 @@ Each ZIP also contains an `INSTALL.txt` and the pgvector `LICENSE`.
 **PowerShell**
 
 ```powershell
-(Get-FileHash .\pgvector-v0.8.7-pg17-windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+(Get-FileHash .\pgvector-v0.8.7-pg18-windows-x64.zip -Algorithm SHA256).Hash.ToLower()
 # Compare with the matching line in SHA256SUMS.txt
 ```
 
