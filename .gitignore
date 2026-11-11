@@ -1,0 +1,56 @@
+# ---------------------------------------------------------------
+# Build outputs (produced by the workflow or local test builds)
+# ---------------------------------------------------------------
+/src_pgvector/
+/dist/
+/out/
+/artifacts/
+/release_assets/
+*.zip
+*.sha256
+SHA256SUMS.txt
+
+# Compiled artifacts from local nmake / MSVC builds
+*.dll
+*.lib
+*.exp
+*.obj
+*.pdb
+*.ilk
+*.idb
+
+# ---------------------------------------------------------------
+# Temporary and log files
+# ---------------------------------------------------------------
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+pgvector_install_*/
+
+# ---------------------------------------------------------------
+# Secrets and local configuration (never commit these)
+# ---------------------------------------------------------------
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+secrets.*
+
+# ---------------------------------------------------------------
+# Editors and IDEs
+# ---------------------------------------------------------------
+.vscode/
+.idea/
+*.code-workspace
+
+# ---------------------------------------------------------------
+# OS-generated files
+# ---------------------------------------------------------------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
