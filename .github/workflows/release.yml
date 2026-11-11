@@ -1,0 +1,155 @@
+name: Build and Release Windows Binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      pgvector_tag:
+        description: 'Official pgvector tag to build (e.g., v0.8.7)'
+        required: true
+        default: 'v0.8.7'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build PG ${{ matrix.pg_version }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg_version: [16, 17, 18]
+
+    env:
+      PGV_TAG: ${{ github.event.inputs.pgvector_tag }}
+
+    steps:
+
+      - name: Validate tag format
+        shell: powershell
+        run: |
+          if ($env:PGV_TAG -notmatch '^v\d+\.\d+\.\d+$') {
+            Write-Error "Tag invalido: $env:PGV_TAG"; exit 1
+          }
+
+      - name: Configure MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Checkout pgvector 
+        uses: actions/checkout@v4
+        with:
+          repository: pgvector/pgvector
+          ref: ${{ env.PGV_TAG }}
+          path: src_pgvector
+
+      - name: Install PostgreSQL ${{ matrix.pg_version }}
+        shell: powershell
+        run: |
+          choco install postgresql${{ matrix.pg_version }} --params '/Password:RootPassword123!' -y --no-progress
+          $pgroot = "C:\Program Files\PostgreSQL\${{ matrix.pg_version }}"
+          if (-not (Test-Path "$pgroot\include\server")) {
+          Write-Error "PostgreSQL was not installed correctly at $pgroot"
+          exit 1
+          }
+      - name: Compile pgvector
+        shell: cmd
+        working-directory: src_pgvector
+        run: |
+          set "PGROOT=C:\Program Files\PostgreSQL\${{ matrix.pg_version }}"
+          nmake /F Makefile.win
+
+      - name: Package artifacts and SHA256
+        shell: powershell
+        run: |
+          $ver = $env:PGV_TAG
+          $pgVer = "${{ matrix.pg_version }}"
+          $name = "pgvector-$ver-pg$pgVer-windows-x64"
+          $outDir = "dist\$name"
+
+          if (-not (Test-Path src_pgvector\vector.dll)) {
+          Write-Error "vector.dll was not generated"
+          exit 1
+          }
+          
+          New-Item -ItemType Directory -Path "$outDir\lib","$outDir\share\extension","out" -Force | Out-Null
+
+          # Copying files to the output directory
+          Copy-Item src_pgvector\vector.dll "$outDir\lib\"
+          Copy-Item src_pgvector\vector.control "$outDir\share\extension\"
+          Copy-Item src_pgvector\sql\vector--*.sql "$outDir\share\extension\"
+          Copy-Item src_pgvector\LICENSE "$outDir\"
+
+          @"
+          Manual Installation Instructions:
+
+          1. Copy 'lib\vector.dll' to your PostgreSQL lib directory:
+          e.g. C:\Program Files\PostgreSQL\<version>\lib\
+
+          2. Copy all files from 'share\extension\*' to your PostgreSQL extension directory:
+          e.g. C:\Program Files\PostgreSQL\<version>\share\extension\
+
+          3. In your database (psql or pgAdmin), run:
+          CREATE EXTENSION vector;
+          "@ | Out-File "$outDir\INSTALL.txt" -Encoding ascii
+
+          # Creating a zip archive of the output directory
+          $zip = "out\$name.zip"
+          Compress-Archive -Path "$outDir\*" -DestinationPath $zip -Force
+          
+          # Generate SHA256 checksum
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          [IO.File]::WriteAllText("$zip.sha256", "$hash  $name.zip`n")
+          
+      - name: Smoke test
+        shell: powershell
+        run: |
+          $pg = "C:\Program Files\PostgreSQL\${{ matrix.pg_version }}"
+          Copy-Item src_pgvector\vector.dll "$pg\lib\"
+          Copy-Item src_pgvector\vector.control "$pg\share\extension\"
+          Copy-Item src_pgvector\sql\vector--*.sql "$pg\share\extension\"
+          $env:PGPASSWORD = 'RootPassword123!'
+          & "$pg\bin\psql.exe" -U postgres -c "CREATE EXTENSION vector; SELECT '[1,2,3]'::vector;"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pg${{ matrix.pg_version }}-binaries
+          path: out/*
+          retention-days: 1
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: "*-binaries"
+          merge-multiple: true
+
+      - name: Consolidate checksums
+        run: |
+          cd artifacts
+          cat *.sha256 > SHA256SUMS.txt
+          rm *.sha256
+          sha256sum -c SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.pgvector_tag }}
+          name: "pgvector ${{ github.event.inputs.pgvector_tag }} for Windows (x64)"
+          files: artifacts/*
+          body: |
+            Automated pgvector builds for Windows (x64), compiled from the official
+            [pgvector/pgvector](https://github.com/pgvector/pgvector) repository using GitHub Actions.
+
+            Verify the hashes in `SHA256SUMS.txt` before installing.
+            Each ZIP includes `INSTALL.txt` with setup instructions.
