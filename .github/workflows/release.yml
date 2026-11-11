@@ -105,13 +105,33 @@ jobs:
       - name: Smoke test
         shell: powershell
         run: |
-          $pg = "C:\Program Files\PostgreSQL\${{ matrix.pg_version }}"
-          Copy-Item src_pgvector\vector.dll "$pg\lib\"
-          Copy-Item src_pgvector\vector.control "$pg\share\extension\"
-          Copy-Item src_pgvector\sql\vector--*.sql "$pg\share\extension\"
-          $env:PGPASSWORD = 'RootPassword123!'
-          & "$pg\bin\psql.exe" -U postgres -c "CREATE EXTENSION vector; SELECT '[1,2,3]'::vector;"
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $pg   = "C:\Program Files\PostgreSQL\${{ matrix.pg_version }}"
+          $data = Join-Path $env:RUNNER_TEMP "pgdata"
+          $log  = Join-Path $env:RUNNER_TEMP "pg.log"
+          $port = 54320
+
+          # Install the freshly built extension
+          Copy-Item src_pgvector\vector.dll "$pg\lib\" -Force
+          Copy-Item src_pgvector\vector.control "$pg\share\extension\" -Force
+          Copy-Item src_pgvector\sql\vector--*.sql "$pg\share\extension\" -Force
+
+          # Throwaway cluster, isolated from the preinstalled server
+          & "$pg\bin\initdb.exe" -D $data -U postgres -A trust -E UTF8
+          if ($LASTEXITCODE -ne 0) { throw "initdb failed" }
+
+          & "$pg\bin\pg_ctl.exe" -D $data -o "-p $port" -l $log -w start
+          if ($LASTEXITCODE -ne 0) { Get-Content $log; throw "pg_ctl start failed" }
+
+          try {
+            & "$pg\bin\psql.exe" -h 127.0.0.1 -p $port -U postgres -v ON_ERROR_STOP=1 `
+              -c "CREATE EXTENSION vector;" `
+              -c "SELECT '[1,2,3]'::vector <-> '[1,2,4]'::vector AS distance;"
+            if ($LASTEXITCODE -ne 0) { throw "smoke test failed" }
+          }
+          finally {
+            & "$pg\bin\pg_ctl.exe" -D $data -m immediate stop
+            if (Test-Path $log) { Get-Content $log }
+          }
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
